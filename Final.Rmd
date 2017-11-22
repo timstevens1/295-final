@@ -1,0 +1,29 @@
+---
+title: "Final Project"
+author: "Tim Stevens"
+date: "11/2/2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Loading the data:
+```{r}
+happiness.data = read.csv("sumhapps.csv")
+stock.data = read.csv("NASDAQCOM.csv")
+colnames(stock.data) = c("date","price")
+happiness.data$ID = seq.int(nrow(happiness.data))
+data = merge(happiness.data, stock.data, by= "date")
+data = cbind(data, weekdays(as.Date(data$date)))
+pairs(data)
+data$price = as.numeric(data$price)
+cor(data$value,data$price)
+lm.fit = lm(price~value,data)
+plot(data$value, data$price)
+abline(lm.fit)
+summary(lm.fit)
+lag(data$value)
+```
+
