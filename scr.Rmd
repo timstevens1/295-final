@@ -1,0 +1,102 @@
+---
+title: "hedno"
+author: "Ali jacved"
+date: "11/2/2017"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+
+```{r}
+library(ISLR)
+rm(my_data)
+setwd('/Users/alijaved/Desktop/CS295_ISLR/hedno')
+happiness_data = read.csv("sumhapps.csv")  # read csv file 
+#happiness_data = read.csv("coindesk.csv")  # read csv file 
+happiness_data[[1]] <- as.Date(happiness_data[[1]])
+colnames(happiness_data) <- c("date", "h_value")
+stock_data = read.csv("NASDAQCOM.csv")
+stock_data[[1]] <- as.Date(stock_data[[1]])
+colnames(stock_data) <- c("date", "s_value")
+
+#names(stock_data)
+my_data =merge(happiness_data,stock_data, by ='date')
+my_data$day <- weekdays(as.Date(my_data$date))
+#names(my_data)
+
+pairs(my_data[,c("h_value","s_value")])
+my_data$s_value<- as.numeric(as.character(my_data$s_value))
+my_data$h_value<- as.numeric(as.character(my_data$h_value))
+
+cor(my_data[,c("h_value","s_value")],use="complete.obs")
+
+```
+
+
+
+
+```{r}
+my_data$h_diff <- c(0, diff(my_data$h_value))
+my_data$s_diff <- c(0, diff(my_data$s_value))
+my_data$s_binary <- ifelse(my_data$s_diff>0, 1,0)
+my_data$h_binary <- ifelse(my_data$h_diff>0, 1,0)
+pairs(my_data[,c("h_diff","s_diff","s_binary","h_binary")])
+```
+Calculate lag for happiness
+```{r}
+library(Hmisc)
+my_data$h_lag1 <- Lag(my_data$h_value, +1)
+my_data$h_lag2 <- Lag(my_data$h_value, +2)
+my_data$h_lag10 <- Lag(my_data$h_value, +10)
+my_data$h_lag1_diff <- c(0, diff(my_data$h_lag1))
+my_data$h_lag2_diff <- c(0, diff(my_data$h_lag2))
+my_data$h_lag1_binary <- ifelse(my_data$h_lag1_diff>0, 1,0)
+my_data$h_lag2_binary <- ifelse(my_data$h_lag2_diff>0, 1,0)
+```
+
+
+
+
+
+```{r}
+pairs(my_data[,c("h_lag1","h_lag2","s_value")])
+```
+
+```{r}
+pairs(my_data[,c("h_lag1_binary","s_binary")])
+```
+
+```{r}
+names(my_data)
+glm.fit = glm(s_binary~h_lag1, data= my_data, family= binomial)
+summary(glm.fit)
+
+
+newdat <- data.frame(h_lag1=seq(5, 7,len=100))
+newdat$vs = predict(glm.fit, newdata=newdat, type="response")
+#plot(vs~hp, data=my_data, col="red4")
+
+newdat$vs<- as.numeric(as.character(newdat$vs))
+plot(my_data$h_lag1, my_data$s_binary)
+lines(newdat$vs ~ newdat$h_lag1)
+
+#abline(glm.fit)
+```
+```{r}
+my_data$s_value<- as.numeric(as.character(my_data$s_value))
+
+```
+
+```{r}
+sub = subset(my_data,select=-c(day,date))
+cor(sub,use="complete.obs")
+
+```
+
