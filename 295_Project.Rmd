@@ -1,0 +1,87 @@
+---
+title: "295_project"
+author: "Ali jaced"
+date: "11/2/2017"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+
+```{r}
+library(ISLR)
+setwd('/Users/alijaved/Desktop/CS295_ISLR/project_git/295-final-master')
+SP500 = read.csv("SP500.csv")  # read csv file 
+NASDAQ = read.csv("NASDAQCOM.csv")
+
+#convert date to date format
+SP500[[1]] <- as.Date(SP500[[1]])
+NASDAQ[[1]] <- as.Date(NASDAQ[[1]])
+
+#convert index value to numeric
+SP500$SP500<- as.numeric(as.character(SP500$SP500))
+NASDAQ$NASDAQCOM<- as.numeric(as.character(NASDAQ$NASDAQCOM))
+
+#create binary columns for increase and decrease
+#take difference with last days value
+SP500$SP500_difference <- c(0, diff(SP500$SP500))
+NASDAQ$NASDAQCOM_difference <- c(0, diff(NASDAQ$NASDAQCOM))
+#make binary direction
+SP500$SP500_direction <- ifelse(SP500$SP500_difference>0, 1,0)
+NASDAQ$NASDAQCOM_direction <- ifelse(NASDAQ$NASDAQCOM_difference>0, 1,0)
+
+#merge into single table
+data =merge(SP500,NASDAQ, by ='DATE')
+data$day <- weekdays(as.Date(data$DATE))
+```
+
+Initial analysis. Pairs and coorelation.
+
+
+
+```{r}
+pairs(data[,c("SP500","NASDAQCOM")])
+sub = subset(data,select=-c(day,DATE))
+cor(data[,c("SP500","NASDAQCOM")])
+```
+
+
+
+
+
+Lets do a logistic regression. Too much co-relation between both!
+
+```{r}
+
+lm.fit = lm(SP500~NASDAQCOM, data= data)
+summary(lm.fit)
+```
+```{r}
+glmSP500.fit = glm(SP500_direction~NASDAQCOM_difference, data= data, family = binomial)
+summary(glmSP500.fit)
+
+
+```
+
+
+
+logistic regression plot predicting SP500 direction (up or down) based on the NASDAQ difference from last day
+
+```{r}
+newdat <- data.frame(NASDAQCOM_difference=seq(-206, 206,len=200))
+newdat$vs = predict(glmSP500.fit, newdata=newdat, type="response")
+#plot(vs~hp, data=my_data, col="red4")
+
+newdat$vs<- as.numeric(as.character(newdat$vs))
+plot(data$NASDAQCOM_difference,data$SP500_direction)
+lines(newdat$vs ~ newdat$NASDAQCOM_difference)
+
+#abline(glm.fit)
+```
+
