@@ -1,0 +1,233 @@
+---
+title: "CS295_Project_V3"
+author: "Ali jaced"
+date: "12/1/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Load and clean data, create features, merge into single table, declare hosmerlem function.
+
+```{r}
+library(ISLR)
+setwd('/Users/alijaved/Desktop/CS295_ISLR/project_git/295-final-master')
+SP500 = read.csv("SP500.csv")  # read csv file 
+NASDAQ = read.csv("NASDAQCOM.csv")
+HAPPINESS = read.csv("sumhapps.csv")
+colnames(HAPPINESS) <- c("DATE", "HAPPINESS")
+
+
+#convert date to date format
+SP500[[1]] <- as.Date(SP500[[1]])
+NASDAQ[[1]] <- as.Date(NASDAQ[[1]])
+HAPPINESS[[1]] <- as.Date(HAPPINESS[[1]])
+
+#convert index value to numeric
+SP500$SP500<- as.numeric(as.character(SP500$SP500))
+NASDAQ$NASDAQCOM<- as.numeric(as.character(NASDAQ$NASDAQCOM))
+HAPPINESS$HAPPINESS<- as.numeric(as.character(HAPPINESS$HAPPINESS))
+
+#create binary columns for increase and decrease
+#take difference with last days value
+SP500$SP500_difference <- c(0, diff(SP500$SP500))
+NASDAQ$NASDAQCOM_difference <- c(0, diff(NASDAQ$NASDAQCOM))
+HAPPINESS$HAPPINESS_difference <-c(0,diff(HAPPINESS$HAPPINESS))
+
+#make binary direction
+SP500$SP500_direction <- ifelse(SP500$SP500_difference>0, 1,0)
+NASDAQ$NASDAQCOM_direction <- ifelse(NASDAQ$NASDAQCOM_difference>0, 1,0)
+HAPPINESS$HAPPINESS_direction <- ifelse(HAPPINESS$HAPPINESS_difference>0, 1,0)
+
+#merge SP500, NASDAQ and HAPPINESS into single table
+data =merge(SP500,NASDAQ, by ='DATE')
+data = merge(data, HAPPINESS, by = 'DATE')
+data$day <- weekdays(as.Date(data$DATE))
+
+
+#remove seperate tables
+rm(SP500)
+rm(HAPPINESS)
+rm(NASDAQ)
+
+
+library(Hmisc)
+#lag for SP500
+data$SP500_lag1 <- Lag(data$SP500, +1)
+data$SP500_lag2 <- Lag(data$SP500, +2)
+data$SP500_lag10 <- Lag(data$SP500, +10)
+
+#lag for NASDAQCOM
+data$NASDAQCOM_lag1 <- Lag(data$NASDAQCOM, +1)
+data$NASDAQCOM_lag2 <- Lag(data$NASDAQCOM, +2)
+data$NASDAQCOM_lag10 <- Lag(data$NASDAQCOM, +10)
+
+#lag for HAPPINESS
+data$HAPPINESS_lag1 <- Lag(data$HAPPINESS,+1)
+
+#difference for SP500
+data$SP500_lag1_difference <- c(0, diff(data$SP500_lag1))
+data$SP500_lag2_difference <- c(0, diff(data$SP500_lag2))
+data$SP500_lag10_difference <- c(0, diff(data$SP500_lag10))
+
+#difference for NASDAQCOM
+data$NASDAQCOM_lag1_difference <- c(0, diff(data$NASDAQCOM_lag1))
+data$NASDAQCOM_lag2_difference <- c(0, diff(data$NASDAQCOM_lag2))
+data$NASDAQCOM_lag10_difference <- c(0, diff(data$NASDAQCOM_lag10))
+
+#DIFFERENCE FOR HAPPINESS
+data$HAPPINESS_lag1_difference <- c(0, diff(data$HAPPINESS_lag1))
+
+#direction for SP500 lag variables
+data$SP500_lag1_direction <- ifelse(data$SP500_lag1_difference>0, 1,0)
+data$SP500_lag2_direction <- ifelse(data$SP500_lag2_difference>0, 1,0)
+data$SP500_lag10_direction <- ifelse(data$SP500_lag10_difference>0, 1,0)
+
+#direction for NASDAQCOM lag variables
+data$NASDAQCOM_lag1_direction <- ifelse(data$NASDAQCOM_lag1_difference>0, 1,0)
+data$NASDAQCOM_lag2_direction <- ifelse(data$NASDAQCOM_lag2_difference>0, 1,0)
+data$NASDAQCOM_lag10_direction <- ifelse(data$NASDAQCOM_lag10_difference>0, 1,0)
+
+
+
+
+
+#omit na rows for analysis and seperate into train and test
+data = na.omit(data)
+smp_size <- floor(0.75 * nrow(data))
+
+
+
+#scale SP500 and NASDAQCOM
+data$SP500_scaled <- scale(data$SP500)
+data$NASDAQCOM_scaled <- scale(data$NASDAQCOM)
+
+## set the seed to make your partition reproductible
+set.seed(1)
+train_ind <- sample(seq_len(nrow(data)), size = smp_size)
+
+
+
+
+train <- data[train_ind, ]
+test <- data[-train_ind, ]
+
+
+
+hosmerlem = function(y, yhat, g=10) 
+{
+  cutyhat = cut(yhat, breaks = quantile(yhat, 
+                      probs=seq(0, 1, 1/g)), include.lowest=TRUE)
+  obs = xtabs(cbind(1 - y, y) ~ cutyhat)
+  expect = xtabs(cbind(1 - yhat, yhat) ~ cutyhat)
+  chisq = sum((obs - expect)^2/expect)
+  P = 1 - pchisq(chisq, g - 2)
+  return(list(chisq=chisq,p.value=P))
+}
+
+
+
+```
+
+
+
+
+
+```{r}
+pairs(train[,c("SP500_scaled","NASDAQCOM_scaled")])
+sub = subset(train,select=-c(day,DATE))
+cor(train[,c("SP500_scaled","NASDAQCOM_scaled")])
+```
+
+```{r}
+glmSP500.fit = glm(SP500_direction~SP500_lag1_difference, data= train, family = binomial)
+summary(glmSP500.fit)
+```
+
+```{r}
+newdat <- data.frame(SP500_lag1_difference=seq(-206, 206,len=200))
+newdat$vs = predict(glmSP500.fit, newdata=newdat, type="response")
+#plot(vs~hp, data=my_data, col="red4")
+
+newdat$vs<- as.numeric(as.character(newdat$vs))
+plot(data$SP500_lag1_difference,data$SP500_direction)
+lines(newdat$vs ~ newdat$SP500_lag1_difference)
+```
+
+```{r}
+glm.probs =predict(glmSP500.fit, test, type="response")
+glm_link_scores <- predict(glmSP500.fit, test, type="link")
+
+
+glm.probs =predict(glmSP500.fit, test, type="response")
+glm.pred=rep(0 ,467)
+glm.pred[glm.probs>.5]=1
+table(glm.pred ,test$SP500_direction)
+mean(glm.pred == test$SP500_direction)
+
+```
+
+
+
+```{r}
+library(pROC)
+
+simple_roc <- function(labels, scores){
+  labels <- labels[order(scores, decreasing=TRUE)]
+  data.frame(TPR=cumsum(labels)/sum(labels), FPR=cumsum(!labels)/sum(!labels), labels)
+}
+
+plot(roc(test$SP500_direction, glm.probs, direction="<"),
+     col="yellow", lwd=3, main="ROC CURVE SP500~SP500 Change lag1")
+
+glm_simple_roc <- simple_roc(test$SP500_direction==1, glm_link_scores)
+with(glm_simple_roc, points(1 - FPR, TPR, col=1 + labels))
+```
+
+```{r}
+hosmerlem(y = as.numeric(train$SP500_direction), yhat = fitted(glmSP500.fit))
+```
+
+
+
+```{r}
+library (class)
+train.X=cbind(train$NASDAQCOM_lag1_difference,train$NASDAQCOM_lag2_difference,train$NASDAQCOM_lag10_difference)
+test.X=cbind (test$NASDAQCOM_lag1_difference, test$NASDAQCOM_lag2_difference, test$NASDAQCOM_lag10_difference)
+train.Direction =train$SP500_direction
+```
+
+
+
+```{r}
+set.seed (1)
+knn.pred=knn(train.X,test.X,train.Direction ,k=52)
+table(knn.pred ,test$SP500_direction)
+mean(knn.pred == test$SP500_direction)
+plot(knn.pred)
+```
+
+
+
+```{r}
+library(caret)
+model <- train(
+    as.factor(SP500_direction)~NASDAQCOM_difference, 
+    data=train, 
+    method='knn',
+    tuneGrid=expand.grid(.k=1:50),
+    metric='Accuracy',
+    trControl=trainControl(
+        method='repeatedcv', 
+        number=10, 
+        repeats=15))
+
+model
+plot(model)
+
+
+```
+
